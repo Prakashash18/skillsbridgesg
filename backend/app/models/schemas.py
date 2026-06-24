@@ -196,6 +196,7 @@ class ProfileConversationRequest(BaseModel):
 
 class ProfileConversationResponse(BaseModel):
     mode: Literal["openai", "mock"]
+    model: str | None = None
     assistant_message: str
     follow_up_questions: list[str]
     suggested_replies: list[str] = []

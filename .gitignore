@@ -6,3 +6,7 @@ backend/storage/*.db
 
 frontend/.next/
 frontend/node_modules/
+
+# Python bytecode
+__pycache__/
+*.pyc

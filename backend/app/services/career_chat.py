@@ -1,3 +1,4 @@
+import os
 import re
 
 from app.data.repository import get_role, get_role_skills, list_roles, list_unique_skills
@@ -553,8 +554,12 @@ def _questions(skills: list[str]) -> list[str]:
 
 
 def _response(mode, assistant_message, questions, role, profile, assessments, confidence, ready, evidence, suggested_replies=None):
+    # Surface the live model name so the UI can show "powered by" — only for real
+    # OpenAI responses; mock/heuristic fallbacks leave it null.
+    model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini") if mode == "openai" else None
     return ProfileConversationResponse(
         mode=mode,
+        model=model,
         assistant_message=assistant_message,
         follow_up_questions=questions,
         suggested_replies=suggested_replies or [],

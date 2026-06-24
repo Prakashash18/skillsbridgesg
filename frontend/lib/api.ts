@@ -122,6 +122,7 @@ export type ChatMessage = {
 
 export type ProfileConversation = {
   mode: "openai" | "mock";
+  model?: string | null;
   assistant_message: string;
   follow_up_questions: string[];
   suggested_replies: string[];

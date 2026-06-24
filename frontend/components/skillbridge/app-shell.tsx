@@ -34,7 +34,7 @@ import {
   Upload,
   User,
 } from "lucide-react";
-import { api, ChatMessage, CourseSearch, GapAnalysis, Market, Plan, PracticalGapSkill, Profile, ProfileConversation, Recommendation, Role } from "@/lib/api";
+import { api, ChatMessage, CourseSearch, GapAnalysis, Market, Plan, Profile, ProfileConversation, Recommendation, Role } from "@/lib/api";
 
 type Stage = "intake" | "roles" | "role" | "market" | "plan";
 
@@ -304,7 +304,7 @@ export function SkillBridgeApp() {
             />
           ) : null}
           {stage === "roles" ? <RoleExplorer profile={profile} recommendations={recommendations} onBack={() => setStage("intake")} onChoose={chooseRole} busy={busy} /> : null}
-          {stage === "role" && selected && gap ? <RoleDetail selected={selected} gap={gap} onBack={() => setStage("roles")} onJobs={scrapeJobs} onPlan={buildPlan} busy={busy} /> : null}
+          {stage === "role" && selected && gap ? <RoleDetail selected={selected} gap={gap} onBack={() => setStage("roles")} onJobs={scrapeJobs} onPlan={buildPlan} busy={busy} onReanalyse={reanalyseWithExperience} /> : null}
           {stage === "market" && selected && market ? <MarketView selected={selected} market={market} onBack={() => setStage("role")} onPlan={buildPlan} busy={busy} onReanalyse={reanalyseWithExperience} /> : null}
           {stage === "plan" && plan ? <PlanView plan={plan} courses={courses} onBack={() => setStage(market ? "market" : "role")} onExploreMore={() => setStage("roles")} /> : null}
         </div>
@@ -590,6 +590,7 @@ function Intake(props: {
                 {props.aiAnalyzing ? "Analyzing…" : "Online · ready"}
               </div>
             </div>
+            <OpenAIBadge conversation={props.conversation} />
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col">
@@ -688,6 +689,31 @@ function Intake(props: {
         </aside>
       </div>
     </div>
+  );
+}
+
+function OpenAILogo({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071.006l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071-.006l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z" />
+    </svg>
+  );
+}
+
+function OpenAIBadge({ conversation }: { conversation: ProfileConversation | null }) {
+  // Fallback flow (no API key) returns mode "mock" — be honest and hide the
+  // OpenAI badge. Before the first turn, show the configured model optimistically.
+  if (conversation && conversation.mode === "mock") return null;
+  const model = (conversation?.model || "gpt-4.1").toUpperCase();
+  return (
+    <span
+      title={`Conversation powered by OpenAI ${model}`}
+      className="ml-auto hidden items-center gap-1.5 rounded-full border border-line bg-subtle px-2.5 py-1 text-[11px] font-semibold text-body sm:inline-flex"
+    >
+      <OpenAILogo className="h-3.5 w-3.5 text-ink" />
+      <span className="text-muted">Powered by</span>
+      <span className="text-ink">OpenAI {model}</span>
+    </span>
   );
 }
 
@@ -991,13 +1017,54 @@ function RoleMatchCard({ item, onChoose, busy }: { item: Recommendation; onChoos
   );
 }
 
-function RoleDetail({ selected, gap, onBack, onJobs, onPlan, busy }: { selected: Recommendation; gap: GapAnalysis; onBack: () => void; onJobs: () => void; onPlan: () => void; busy: boolean }) {
+type GapRow = {
+  title: string;
+  level?: number | null;
+  type: "TSC" | "CCS";
+  isEmerging?: boolean;
+  isCasl?: boolean;
+  why?: string;
+  signal?: string | null;
+  source?: "conversation" | "catalog" | "jobs";
+};
+
+function buildGapRows(gap: GapAnalysis): GapRow[] {
+  // The AI "practical gaps" and the catalog "missing" list are largely the same
+  // skills shown twice. Merge them into one deduped list so the user sees each
+  // skill once, with the richest available context.
+  const byTitle = new Map<string, GapRow>();
+  for (const item of gap.missing) {
+    byTitle.set(item.skill.canonical_title, {
+      title: item.skill.canonical_title,
+      level: item.target_proficiency_level,
+      type: item.skill.skill_type,
+      isEmerging: item.skill.is_emerging,
+      isCasl: item.skill.is_casl,
+    });
+  }
+  for (const practical of gap.practical_gap_skills || []) {
+    const existing = byTitle.get(practical.skill) || { title: practical.skill, type: "TSC" as const };
+    existing.why = practical.why_required;
+    existing.signal = practical.current_signal;
+    existing.source = practical.evidence_source;
+    byTitle.set(practical.skill, existing);
+  }
+  return Array.from(byTitle.values());
+}
+
+function RoleDetail({ selected, gap, onBack, onJobs, onPlan, busy, onReanalyse }: { selected: Recommendation; gap: GapAnalysis; onBack: () => void; onJobs: () => void; onPlan: () => void; busy: boolean; onReanalyse: (notes: Record<string, string>) => void }) {
   const match = Math.round(gap.match_score * 100);
+  const rows = useMemo(() => buildGapRows(gap), [gap]);
+  const [evidence, setEvidence] = useState<Record<string, string>>({});
+  const addedCount = Object.values(evidence).filter((value) => value.trim()).length;
+  const setSkillEvidence = (title: string, text: string) => setEvidence((prev) => ({ ...prev, [title]: text }));
+
   return (
     <div>
-      <PageHeader eyebrow="Step 2 · Gap analysis" title={selected.role.role_title} subtitle="Official SkillsFuture gap analysis for this role." action={<BackButton onClick={onBack} />} />
+      <PageHeader eyebrow="Step 2 · Gap analysis" title={selected.role.role_title} subtitle="What you'd need to build to move into this role — one skill at a time." action={<BackButton onClick={onBack} />} />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_336px]">
         <div className="space-y-5">
+          {/* Readiness summary — donut + collapsible AI explanation */}
           <Card>
             <div className="grid gap-5 md:grid-cols-[160px_1fr] md:items-center">
               <Donut value={match} label="Match" />
@@ -1005,10 +1072,10 @@ function RoleDetail({ selected, gap, onBack, onJobs, onPlan, busy }: { selected:
                 <div className="flex items-center gap-1.5">
                   <h2 className="text-lg font-bold text-ink">Transition readiness</h2>
                   <InfoTip title="How the match is computed" source={SOURCE.framework}>
-                    Your inferred skills are compared against this role's official required TSC/CCS skills and proficiency levels. The donut shows direct matches; weighted overlap credits partial proficiency. Gaps below are skills the role needs that you have not yet evidenced.
+                    Your inferred skills are compared against this role's official required TSC/CCS skills and proficiency levels. The donut shows direct matches; weighted overlap credits partial proficiency. The checklist below is the skills this role needs that you haven't shown yet.
                   </InfoTip>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-body">{gap.ai_summary || `You have a ${match}% direct skill match. The remaining gaps are the best candidates for a short proof project and course plan.`}</p>
+                <CollapsibleText text={gap.ai_summary || `You have a ${match}% direct skill match. The skills below are your best targets for a short proof project and course plan.`} />
                 <div className="mt-4 flex flex-wrap gap-1.5">
                   <TierBadge tier={selected.tier} />
                   <Chip>{Math.round(gap.weighted_overlap * 100)}% weighted overlap</Chip>
@@ -1017,11 +1084,52 @@ function RoleDetail({ selected, gap, onBack, onJobs, onPlan, busy }: { selected:
               </div>
             </div>
           </Card>
-          {gap.practical_gap_skills?.length ? <PracticalGapPanel gaps={gap.practical_gap_skills} /> : null}
-          <div className="grid gap-4 lg:grid-cols-2">
-            <GapList title="Other skills required" items={gap.missing} />
-            <GapList title="Depth gaps" items={gap.proficiency_gaps} />
-          </div>
+
+          {/* Scaffolded skill checklist */}
+          {rows.length ? (
+            <Card className="overflow-hidden p-0">
+              <div className="border-b border-line px-5 py-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <SectionLabel icon={<Target size={15} />}>Skills to build ({rows.length})</SectionLabel>
+                    <InfoTip title="Where each skill comes from" source={SOURCE.framework}>
+                      These are the skills this role needs that you haven't evidenced yet. Tap <b>Why?</b> to see why it matters, or <b>I have this</b> to add a project or certificate — then update your match.
+                    </InfoTip>
+                  </div>
+                  {addedCount > 0 ? <Chip tone="brand">{addedCount} marked</Chip> : null}
+                </div>
+                <p className="mt-1.5 text-xs leading-5 text-muted">Already have one? Tap "I have this" and add a project or cert — we'll re-score your match.</p>
+              </div>
+              <div className="divide-y divide-line">
+                {rows.map((row, index) => (
+                  <GapSkillCard key={row.title} row={row} index={index} evidenceText={evidence[row.title] || ""} onEvidence={setSkillEvidence} />
+                ))}
+              </div>
+              {addedCount > 0 ? (
+                <div className="border-t border-line bg-brandSofter px-5 py-4">
+                  <Button onClick={() => onReanalyse(evidence)} disabled={busy} className="w-full" icon={<Sparkles size={16} />}>
+                    Update my match with {addedCount} skill{addedCount !== 1 ? "s" : ""} I have
+                  </Button>
+                </div>
+              ) : null}
+            </Card>
+          ) : null}
+
+          {/* Depth gaps only when present */}
+          {gap.proficiency_gaps?.length ? (
+            <Card>
+              <SectionLabel icon={<TrendingUp size={15} />}>Skills needing more depth ({gap.proficiency_gaps.length})</SectionLabel>
+              <div className="mt-3 space-y-2">
+                {gap.proficiency_gaps.map((item, index) => (
+                  <div key={`${item.skill.canonical_title}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border border-line bg-subtle px-3.5 py-2.5">
+                    <span className="text-sm font-semibold text-ink">{item.skill.canonical_title}</span>
+                    <span className="shrink-0 text-xs font-medium text-muted">level {item.current_proficiency_level ?? "-"} → {item.target_proficiency_level ?? "-"}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ) : null}
+
           <div className="flex flex-wrap gap-3">
             <Button onClick={onJobs} disabled={busy} icon={<Search size={16} />}>
               Scrape job openings
@@ -1032,14 +1140,88 @@ function RoleDetail({ selected, gap, onBack, onJobs, onPlan, busy }: { selected:
           </div>
         </div>
         <InsightsRail
-          title="Gap summary"
+          title="What to do here"
           items={[
-            `${gap.missing.length} skills are missing from your current profile.`,
-            `${gap.proficiency_gaps.length} skills need more depth.`,
-            "Next, validate whether employers actually mention these in real job descriptions.",
+            `This role needs ${rows.length} skill${rows.length !== 1 ? "s" : ""} you haven't shown yet.`,
+            "Tap a skill to see why it matters, or mark the ones you already have.",
+            "Adding a project or cert re-scores your match instantly.",
+            "Next, check whether employers actually ask for these in real jobs.",
           ]}
         />
       </div>
+    </div>
+  );
+}
+
+function CollapsibleText({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > 170;
+  return (
+    <div className="mt-2">
+      <p className={`text-sm leading-6 text-body ${!open && long ? "line-clamp-2" : ""}`}>{text}</p>
+      {long ? (
+        <button onClick={() => setOpen((value) => !value)} className="mt-1 text-xs font-semibold text-brand hover:text-brandStrong">
+          {open ? "Show less" : "Read more"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function GapSkillCard({ row, index, evidenceText, onEvidence }: { row: GapRow; index: number; evidenceText: string; onEvidence: (title: string, text: string) => void }) {
+  const [showWhy, setShowWhy] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const has = Boolean(evidenceText.trim());
+  const sourceLabel = row.source ? { conversation: "your chat", catalog: "the role profile", jobs: "job postings" }[row.source] : null;
+  return (
+    <div className={`transition ${has ? "bg-brandSofter" : ""}`}>
+      <div className="flex items-start justify-between gap-3 px-5 py-3.5">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${has ? "bg-brand text-white" : "bg-subtle text-muted"}`}>
+            {has ? <Check size={13} /> : index + 1}
+          </span>
+          <div className="min-w-0">
+            <div className="text-sm font-bold text-ink">{row.title}</div>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              {row.level ? <Chip>Level {row.level}</Chip> : null}
+              <Chip><Term term={row.type} /></Chip>
+              {row.isEmerging ? <Chip tone="violet"><Term term="Emerging" /></Chip> : null}
+              {sourceLabel ? <span className="text-[11px] text-muted">· flagged by {sourceLabel}</span> : null}
+            </div>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {row.why ? (
+            <button onClick={() => setShowWhy((value) => !value)} className="rounded-lg px-2 py-1 text-xs font-semibold text-muted transition hover:text-brand">
+              {showWhy ? "Hide" : "Why?"}
+            </button>
+          ) : null}
+          <button
+            onClick={() => setAdding((value) => !value)}
+            className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${has ? "border-brand bg-brand text-white" : "border-line text-brand hover:border-brandRing"}`}
+          >
+            {has ? "Edit" : "I have this"}
+          </button>
+        </div>
+      </div>
+      {showWhy && row.why ? (
+        <div className="px-5 pb-3.5 pl-14 text-xs leading-5 text-body">
+          {row.why}
+          {row.signal ? <p className="mt-1 text-muted">Right now: {row.signal}</p> : null}
+        </div>
+      ) : null}
+      {adding ? (
+        <div className="px-5 pb-4 pl-14">
+          <textarea
+            value={evidenceText}
+            onChange={(event) => onEvidence(row.title, event.target.value)}
+            placeholder={`Add a project, certificate, or example that shows ${row.title}…`}
+            rows={2}
+            className="w-full resize-none rounded-lg border border-line bg-surface p-2.5 text-sm leading-6 outline-none transition placeholder:text-faint focus:border-brandRing"
+          />
+          <button onClick={() => setAdding(false)} className="mt-1.5 text-xs font-semibold text-brand hover:text-brandStrong">Save ✓</button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1306,31 +1488,6 @@ function MarketChart({ data }: { data: { name: string; value: number }[] }) {
   );
 }
 
-function PracticalGapPanel({ gaps }: { gaps: PracticalGapSkill[] }) {
-  return (
-    <Card>
-      <div className="flex items-center gap-1.5">
-        <SectionLabel icon={<Sparkles size={15} />}>AI practical gaps</SectionLabel>
-        <InfoTip title="Where each gap comes from" source={SOURCE.framework}>
-          Each gap is a skill the target role needs that you have not yet shown. The tag on each card marks its evidence source — <b>conversation</b> (from what you told us), <b>catalog</b> (the role's SkillsFuture profile), or <b>jobs</b> (seen in job postings).
-        </InfoTip>
-      </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        {gaps.slice(0, 6).map((gap, index) => (
-          <div key={`${gap.skill}-${gap.evidence_source}-${index}`} className="rounded-xl border border-line bg-subtle p-3.5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="text-sm font-bold text-ink">{gap.skill}</div>
-              <Chip>{gap.evidence_source}</Chip>
-            </div>
-            <p className="mt-2 text-sm leading-6 text-body">{gap.why_required}</p>
-            {gap.current_signal ? <p className="mt-2 text-xs leading-5 text-muted">Current signal: {gap.current_signal}</p> : null}
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
 function PageHeader({ eyebrow, title, subtitle, action }: { eyebrow: string; title: string; subtitle: string; action?: React.ReactNode }) {
   return (
     <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -1516,34 +1673,6 @@ function Donut({ value, label, rawLabel = false }: { value: number; label: strin
         <div className="text-[11px] font-medium text-muted">{label}</div>
       </div>
     </div>
-  );
-}
-
-function GapList({ title, items }: { title: string; items: GapAnalysis["missing"] }) {
-  return (
-    <Card>
-      <h2 className="text-sm font-bold text-ink">{title}</h2>
-      <div className="mt-3 space-y-2.5">
-        {items.length ? (
-          items.map((item, index) => (
-            <div key={`${item.skill.canonical_title}-${item.target_proficiency_level ?? "none"}-${item.status}-${index}`} className="rounded-xl border border-line bg-subtle p-3.5">
-              <div className="text-sm font-bold text-ink">{item.skill.canonical_title}</div>
-              <div className="mt-0.5 text-xs text-muted">
-                Required level {item.target_proficiency_level ?? "-"}
-                {item.current_proficiency_level ? ` · current ${item.current_proficiency_level}` : ""}
-              </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                <Chip><Term term={item.skill.skill_type} /></Chip>
-                {item.skill.is_emerging ? <Chip tone="violet"><Term term="Emerging" /></Chip> : null}
-                {item.skill.is_casl ? <Chip><Term term="CASL" /></Chip> : null}
-              </div>
-            </div>
-          ))
-        ) : (
-          <p className="text-sm leading-6 text-muted">No major gaps found.</p>
-        )}
-      </div>
-    </Card>
   );
 }
 
