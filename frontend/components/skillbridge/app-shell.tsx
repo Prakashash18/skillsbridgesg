@@ -125,7 +125,7 @@ export function SkillBridgeApp() {
     if (!profile) return;
     setBusy(true);
     setError(null);
-    setTransition({ message: "Finding roles that fit you…", subMessage: "Matching your skills against 2,027 SkillsFuture roles" });
+    setTransition({ message: "Step 2: Finding roles for you", subMessage: "Matching your skills to 2,027 SkillsFuture roles…" });
     try {
       const response = await api.recommend(profile);
       setRecommendations(response.recommendations);
@@ -143,7 +143,7 @@ export function SkillBridgeApp() {
     setSelected(recommendation);
     setBusy(true);
     setError(null);
-    setTransition({ message: "Working out the gap…", subMessage: "Comparing your skills with what this role needs" });
+    setTransition({ message: "Working out your gap", subMessage: "Comparing your skills with what this role needs…" });
     try {
       const response = await api.gap(profile, recommendation.role.role_id);
       setGap(response);
@@ -160,7 +160,7 @@ export function SkillBridgeApp() {
     if (!selected) return;
     setBusy(true);
     setError(null);
-    setTransition({ message: "Searching live job openings…", subMessage: "Scraping Singapore jobs via Google · powered by Apify" });
+    setTransition({ message: "Step 3: Finding real jobs", subMessage: "Searching live Singapore openings via Apify…" });
     try {
       const response = await api.market(selected.role.role_id, "Singapore", 8, true);
       setMarket(response);
@@ -177,7 +177,7 @@ export function SkillBridgeApp() {
     if (!profile || !selected) return;
     setBusy(true);
     setError(null);
-    setTransition({ message: "Building your 30-day transition plan…", subMessage: "Finding courses and structuring your weekly roadmap" });
+    setTransition({ message: "Step 4: Building your plan", subMessage: "Finding courses and laying out your 30 days…" });
     try {
       const planResponse = await api.plan(profile, selected.role.role_id);
       setPlan(planResponse);
@@ -216,7 +216,7 @@ export function SkillBridgeApp() {
     if (!summary || !profile || !selected) return;
     setBusy(true);
     setError(null);
-    setTransition({ message: "Updating your profile with new experience…", subMessage: "Re-running gap analysis with your additional context" });
+    setTransition({ message: "Updating your match", subMessage: "Re-checking your gap with the experience you added…" });
     try {
       const updatedMessages = [...messages, { role: "user" as const, content: `Additional experience context:\n${summary}` }];
       const convResponse = await api.profileConversation(updatedMessages, resumeText);
@@ -415,65 +415,57 @@ function PipelineNav({
 
 function LoadingHUD({ transition, skillNames }: { transition: TransitionState; skillNames: string[] }) {
   const chips = skillNames.length
-    ? skillNames.slice(0, 8)
-    : ["Skills Framework", "TSC Analysis", "Career Mapping", "Gap Analysis", "Unique Skills", "CCS Profile"];
+    ? skillNames.slice(0, 6)
+    : ["Your skills", "Role matching", "Career paths", "Job market", "Your plan"];
   return (
-    <div className="animate-overlay fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden" style={{ background: "linear-gradient(160deg, #0a474c 0%, #052a2d 60%, #031e20 100%)" }}>
-      {/* Soft radial glow behind rings */}
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div className="h-72 w-72 rounded-full opacity-30" style={{ background: "radial-gradient(circle, #16b8aa 0%, transparent 70%)" }} />
-      </div>
-
-      {/* Animated rings + logo */}
-      <div className="relative flex h-52 w-52 items-center justify-center">
-        {/* Outer ping rings */}
-        <span className="absolute h-48 w-48 rounded-full border border-brandRing/60" style={{ animation: "hud-ring 2.6s ease-out infinite" }} />
-        <span className="absolute h-48 w-48 rounded-full border border-brandRing/60" style={{ animation: "hud-ring 2.6s ease-out infinite 1.2s" }} />
-        {/* Spinning dashed ring */}
-        <span
-          className="absolute h-36 w-36 rounded-full border-2 border-dashed border-brandRing/70"
-          style={{ animation: "hud-spin 6s linear infinite" }}
-        />
-        {/* Counter-spin coral accent ring */}
-        <span
-          className="absolute h-24 w-24 rounded-full border-2 border-coral/60"
-          style={{ animation: "hud-spin-rev 4s linear infinite" }}
-        />
-        {/* Center logo */}
-        <div
-          className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brandRing via-brand to-coral shadow-lift"
-          style={{ animation: "hud-pulse 2.2s ease-in-out infinite", boxShadow: "0 0 32px rgba(22,184,170,0.5)" }}
-        >
-          <Sparkles size={26} className="text-white" strokeWidth={2} />
+    <div className="animate-overlay fixed inset-0 z-50 flex items-center justify-center bg-petrolDeep/55 p-4 backdrop-blur-sm">
+      {/* Contained loading card — sits inside the app, not a full-screen takeover */}
+      <div
+        className="relative flex w-[min(420px,92vw)] flex-col items-center overflow-hidden rounded-3xl px-6 pb-7 pt-9 shadow-lift"
+        style={{ background: "linear-gradient(160deg, #0a474c 0%, #052a2d 70%, #031e20 100%)" }}
+      >
+        {/* Soft radial glow */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="h-56 w-56 rounded-full opacity-30" style={{ background: "radial-gradient(circle, #16b8aa 0%, transparent 70%)" }} />
         </div>
-      </div>
 
-      {/* Step message */}
-      <div className="mt-4 px-8 text-center">
-        <p className="text-[22px] font-bold tracking-tight text-white">{transition.message}</p>
-        <p className="mt-2 text-sm font-medium text-white/75">{transition.subMessage}</p>
-      </div>
-
-      {/* Floating skill chips — solid teal wash, fully readable */}
-      <div className="mt-8 flex max-w-xl flex-wrap justify-center gap-2.5 px-8">
-        {chips.map((chip, index) => (
-          <span
-            key={chip}
-            className="inline-flex items-center rounded-full border border-brandRing/50 px-3.5 py-1.5 text-xs font-semibold text-white"
-            style={{
-              background: "rgba(22,184,170,0.18)",
-              animation: `hud-chip-in 3.4s ease-in-out infinite`,
-              animationDelay: `${index * 0.38}s`,
-            }}
+        {/* Animated rings + logo */}
+        <div className="relative flex h-40 w-40 items-center justify-center">
+          <span className="absolute h-36 w-36 rounded-full border border-brandRing/60" style={{ animation: "hud-ring 2.6s ease-out infinite" }} />
+          <span className="absolute h-36 w-36 rounded-full border border-brandRing/60" style={{ animation: "hud-ring 2.6s ease-out infinite 1.2s" }} />
+          <span className="absolute h-28 w-28 rounded-full border-2 border-dashed border-brandRing/70" style={{ animation: "hud-spin 6s linear infinite" }} />
+          <span className="absolute h-20 w-20 rounded-full border-2 border-coral/60" style={{ animation: "hud-spin-rev 4s linear infinite" }} />
+          <div
+            className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brandRing via-brand to-coral"
+            style={{ animation: "hud-pulse 2.2s ease-in-out infinite", boxShadow: "0 0 28px rgba(22,184,170,0.5)" }}
           >
-            {chip}
-          </span>
-        ))}
-      </div>
+            <Sparkles size={24} className="text-white" strokeWidth={2} />
+          </div>
+        </div>
 
-      {/* Shimmer progress bar */}
-      <div className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden">
-        <div className="hud-bar h-full w-full" />
+        {/* Step message */}
+        <div className="relative mt-5 text-center">
+          <p className="text-lg font-bold tracking-tight text-white">{transition.message}</p>
+          <p className="mt-1.5 text-sm font-medium text-white/70">{transition.subMessage}</p>
+        </div>
+
+        {/* Skill chips */}
+        <div className="relative mt-5 flex max-w-full flex-wrap justify-center gap-2">
+          {chips.map((chip, index) => (
+            <span
+              key={chip}
+              className="inline-flex items-center rounded-full border border-brandRing/50 px-3 py-1 text-[11px] font-semibold text-white"
+              style={{ background: "rgba(22,184,170,0.18)", animation: "hud-chip-in 3.4s ease-in-out infinite", animationDelay: `${index * 0.38}s` }}
+            >
+              {chip}
+            </span>
+          ))}
+        </div>
+
+        {/* Shimmer progress bar */}
+        <div className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden">
+          <div className="hud-bar h-full w-full" />
+        </div>
       </div>
     </div>
   );
@@ -624,12 +616,7 @@ function Intake(props: {
             {props.messages.map((message, index) => (
               <ChatBubble key={`${message.role}-${index}`} message={message} />
             ))}
-            {props.busy ? (
-              <div className="flex items-center gap-2 text-sm font-medium text-muted">
-                <Loader2 className="animate-spin text-brand" size={15} />
-                Reading your profile signals…
-              </div>
-            ) : null}
+            {props.busy ? <ChatThinking /> : null}
             <div ref={messagesEndRef} />
           </div>
 
@@ -890,6 +877,37 @@ function DiscoveryPanel({ conversation, status, roleCount, onExplore, aiAnalyzin
         {conversation.ready_to_explore ? "See roles I could move into" : canExplore ? "See roles from here" : "Tell me a bit more first"}
       </Button>
     </Card>
+  );
+}
+
+function ChatThinking() {
+  // The AI turn can take ~45-60s on the free deployment tier (cold start + a
+  // large grounded prompt). Rotate reassuring status lines so the wait feels
+  // handled instead of frozen, with an honest "this can take a moment" cue.
+  const steps = [
+    "Reading what you shared…",
+    "Matching your work to SkillsFuture roles…",
+    "Finding the skills you already have…",
+    "Working through 2,000+ roles — this can take up to a minute…",
+    "Almost there — thanks for your patience…",
+  ];
+  const [index, setIndex] = useState(0);
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const tick = setInterval(() => setSeconds((s) => s + 1), 1000);
+    const advance = setInterval(() => setIndex((i) => Math.min(i + 1, steps.length - 1)), 6000);
+    return () => { clearInterval(tick); clearInterval(advance); };
+  }, []);
+  return (
+    <div className="flex items-start gap-2.5">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brandSoft text-brand">
+        <Loader2 className="animate-spin" size={15} />
+      </div>
+      <div className="rounded-2xl rounded-bl-md border border-line bg-surface px-4 py-2.5 shadow-card">
+        <span key={index} className="animate-rise block text-sm font-medium text-body">{steps[index]}</span>
+        {seconds >= 8 ? <span className="mt-0.5 block text-[11px] text-muted">{seconds}s · the first reply on a sleeping server can take ~a minute</span> : null}
+      </div>
+    </div>
   );
 }
 
