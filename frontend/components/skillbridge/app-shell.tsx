@@ -582,6 +582,10 @@ function Intake(props: {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [showLinkedInGuide, setShowLinkedInGuide] = useState(false);
+  // On phones/tablets the chat and the insights panel can't sit side by side,
+  // so we switch between them with a segmented toggle instead of stacking the
+  // insights below the fold where it never gets seen.
+  const [mobileView, setMobileView] = useState<"chat" | "insights">("chat");
   const starterPrompts = ["I teach programming at ITE", "I manage operations and dashboards", "I run sales and key accounts"];
   const showQuickReplies = props.hasConversation && props.suggestedReplies.length > 0;
 
@@ -590,9 +594,27 @@ function Intake(props: {
   }, [props.messages, props.busy]);
 
   return (
-    <div className="grid gap-4 lg:h-[calc(100dvh-184px)] lg:grid-cols-[minmax(0,1fr)_360px]">
-      {/* Chat panel — fills the viewport so messages get the most room */}
-      <Card className="flex h-[calc(100dvh-184px)] flex-col overflow-hidden p-0 lg:h-full">
+    <div>
+      {/* Phone/tablet view switch — hidden on desktop where both show together */}
+      <div className="mb-3 flex gap-1 rounded-xl border border-line bg-subtle p-1 lg:hidden">
+        <button
+          onClick={() => setMobileView("chat")}
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition ${mobileView === "chat" ? "bg-surface text-brand shadow-card" : "text-muted"}`}
+        >
+          <Bot size={15} /> Chat
+        </button>
+        <button
+          onClick={() => setMobileView("insights")}
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition ${mobileView === "insights" ? "bg-surface text-brand shadow-card" : "text-muted"}`}
+        >
+          <TrendingUp size={15} /> Live insights
+          {props.conversation ? <span className={`h-1.5 w-1.5 rounded-full bg-brand ${props.aiAnalyzing ? "animate-dot" : ""}`} /> : null}
+        </button>
+      </div>
+
+      <div className="grid gap-4 lg:h-[calc(100dvh-184px)] lg:grid-cols-[minmax(0,1fr)_360px]">
+        {/* Chat panel — fills the viewport so messages get the most room */}
+        <Card className={`h-[calc(100dvh-240px)] flex-col overflow-hidden p-0 lg:h-full ${mobileView === "insights" ? "hidden lg:flex" : "flex"}`}>
         <div className="flex shrink-0 items-center gap-2.5 border-b border-line px-4 py-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brandSoft text-brand">
             <Bot size={17} />
@@ -689,12 +711,13 @@ function Intake(props: {
             {showLinkedInGuide ? <LinkedInGuide /> : null}
           </div>
         </div>
-      </Card>
+        </Card>
 
-      {/* Sidebar: discovery panel only */}
-      <aside className="lg:h-full lg:min-h-0">
-        <DiscoveryPanel className="h-full overflow-y-auto" conversation={props.conversation} status={props.status} roleCount={props.roleCount} onExplore={props.onExplore} aiAnalyzing={props.aiAnalyzing} />
-      </aside>
+        {/* Live AI insights — its own full view on phone/tablet, sidebar on desktop */}
+        <aside className={`h-[calc(100dvh-240px)] lg:h-full lg:min-h-0 ${mobileView === "chat" ? "hidden lg:block" : "block"}`}>
+          <DiscoveryPanel className="h-full overflow-y-auto" conversation={props.conversation} status={props.status} roleCount={props.roleCount} onExplore={props.onExplore} aiAnalyzing={props.aiAnalyzing} />
+        </aside>
+      </div>
     </div>
   );
 }
