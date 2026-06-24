@@ -44,14 +44,14 @@ type TransitionState = {
 };
 
 const seedMessage =
-  "Hi, I'm your SkillBridge AI career assistant. Let's start by understanding your current role, then I'll map it to SkillsFuture roles and skills. What's your job title today, and what do you spend most of your week doing?";
+  "Hi! I'm here to help you find your next career move. First, tell me a bit about what you do now — your job title, and what you spend most of your week on.";
 
 /** The four visible pipeline stages, in order. The "role" detail view lives under Roles. */
 const pipeline: { key: Exclude<Stage, "role">; label: string; hint: string; icon: typeof MessagesSquare }[] = [
-  { key: "intake", label: "Conversation", hint: "Map your profile", icon: MessagesSquare },
-  { key: "roles", label: "Roles", hint: "Compare pathways", icon: Compass },
-  { key: "market", label: "Jobs", hint: "Validate demand", icon: Briefcase },
-  { key: "plan", label: "Plan", hint: "30-day roadmap", icon: CalendarCheck },
+  { key: "intake", label: "Talk to us", hint: "Find your role", icon: MessagesSquare },
+  { key: "roles", label: "Pick a direction", hint: "Roles to aim for", icon: Compass },
+  { key: "market", label: "Check it's real", hint: "Live jobs & demand", icon: Briefcase },
+  { key: "plan", label: "Your plan", hint: "How to get there", icon: CalendarCheck },
 ];
 
 function stageIndex(stage: Stage): number {
@@ -125,7 +125,7 @@ export function SkillBridgeApp() {
     if (!profile) return;
     setBusy(true);
     setError(null);
-    setTransition({ message: "Matching your skills to 2,027 SkillsFuture roles…", subMessage: "Scoring overlap across TSC/CCS skill requirements" });
+    setTransition({ message: "Finding roles that fit you…", subMessage: "Matching your skills against 2,027 SkillsFuture roles" });
     try {
       const response = await api.recommend(profile);
       setRecommendations(response.recommendations);
@@ -143,7 +143,7 @@ export function SkillBridgeApp() {
     setSelected(recommendation);
     setBusy(true);
     setError(null);
-    setTransition({ message: "Analysing career pathway gaps…", subMessage: "Comparing your profile against this role's TSC requirements" });
+    setTransition({ message: "Working out the gap…", subMessage: "Comparing your skills with what this role needs" });
     try {
       const response = await api.gap(profile, recommendation.role.role_id);
       setGap(response);
@@ -283,6 +283,13 @@ export function SkillBridgeApp() {
             <span>{error}</span>
           </div>
         ) : null}
+        {stage !== "intake" && profile ? (
+          <JourneyBanner
+            currentRole={profile.role.role_title}
+            targetRole={selected?.role.role_title}
+            match={gap ? Math.round(gap.match_score * 100) : selected ? Math.round(selected.match_score * 100) : undefined}
+          />
+        ) : null}
         <div key={stage} className="animate-rise">
           {stage === "intake" ? (
             <Intake
@@ -320,6 +327,30 @@ export function SkillBridgeApp() {
   );
 }
 
+function JourneyBanner({ currentRole, targetRole, match }: { currentRole: string; targetRole?: string; match?: number }) {
+  return (
+    <div className="mb-5 flex items-center gap-3 rounded-2xl border border-line bg-gradient-to-r from-surface via-surface to-brandSofter px-4 py-3 shadow-card sm:gap-4 sm:px-5">
+      <div className="min-w-0 flex-1">
+        <div className="text-[10px] font-bold uppercase tracking-wide text-muted">You are</div>
+        <div className="truncate text-sm font-bold text-ink sm:text-base">{currentRole}</div>
+      </div>
+      <div className="flex shrink-0 flex-col items-center">
+        <ArrowRight size={20} className="text-brand" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-[10px] font-bold uppercase tracking-wide text-brand">Working toward</div>
+        <div className="truncate text-sm font-bold text-ink sm:text-base">{targetRole || "Choosing your next role…"}</div>
+      </div>
+      {match != null && targetRole ? (
+        <div className="ml-1 hidden shrink-0 flex-col items-center rounded-xl bg-brandSoft px-3 py-1.5 text-center sm:flex">
+          <span className="text-lg font-bold leading-5 text-brand">{match}%</span>
+          <span className="text-[10px] font-semibold text-brand/70">match</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function PipelineNav({
   stage,
   prev,
@@ -334,11 +365,11 @@ function PipelineNav({
   busy: boolean;
 }) {
   const stageLabels: Record<Stage, string> = {
-    intake: "Conversation",
-    roles: "Roles",
-    role: "Gap Analysis",
-    market: "Jobs",
-    plan: "Plan",
+    intake: "Talk to us",
+    roles: "Pick a direction",
+    role: "See the gap",
+    market: "Check it's real",
+    plan: "Your plan",
   };
   const stageNumbers: Record<Stage, string> = {
     intake: "1 / 4",
@@ -785,7 +816,7 @@ function DiscoveryPanel({ conversation, status, roleCount, onExplore, aiAnalyzin
             </span>
           ) : null}
         </div>
-        <p className="mt-3 text-sm leading-6 text-muted">Signals, confidence, and next questions appear here as the conversation develops.</p>
+        <p className="mt-3 text-sm leading-6 text-muted">As you chat, we'll show the role we think you're in and the skills we spot — right here.</p>
         <div className="mt-4 rounded-xl border border-line bg-subtle p-3.5 text-sm text-body">
           <div className="mb-1 flex items-center gap-2 font-semibold text-ink">
             <Database size={15} className="text-brand" /> Backend reference data
@@ -804,7 +835,7 @@ function DiscoveryPanel({ conversation, status, roleCount, onExplore, aiAnalyzin
     <Card className={`${flashing ? "animate-flash" : ""} ${className}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <SectionLabel icon={<Target size={15} />}>Current role discovery</SectionLabel>
+          <SectionLabel icon={<Target size={15} />}>What we've found</SectionLabel>
           {aiAnalyzing ? (
             <span className="flex items-center gap-1.5 text-xs font-semibold text-brand">
               <span className="animate-dot h-2 w-2 rounded-full bg-brand" />
@@ -818,10 +849,10 @@ function DiscoveryPanel({ conversation, status, roleCount, onExplore, aiAnalyzin
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-1.5 text-xs font-medium text-muted">
-              {conversation.ready_to_explore ? "Likely role" : "Still learning"}
+              {conversation.ready_to_explore ? "Your role looks like" : "Still figuring it out"}
               <InfoTip title="Why this role?" source={SOURCE.framework}>
-                The AI matched your described work to the closest official SkillsFuture job role.
-                {conversation.evidence_summary.length ? ` Signals used: ${conversation.evidence_summary.join("; ")}.` : ""}
+                We matched the work you described to the closest official SkillsFuture job role.
+                {conversation.evidence_summary.length ? ` Based on: ${conversation.evidence_summary.join("; ")}.` : ""}
               </InfoTip>
             </div>
             <div className="mt-0.5 text-lg font-bold leading-6 text-ink">{conversation.ready_to_explore ? conversation.mapped_role.role_title : "Need one more detail"}</div>
@@ -831,8 +862,8 @@ function DiscoveryPanel({ conversation, status, roleCount, onExplore, aiAnalyzin
           </div>
           <div className="flex items-center gap-1 text-right">
             <span className="text-2xl font-bold text-brand">{confidence}%</span>
-            <InfoTip title="Role confidence" source={SOURCE.framework}>
-              How sure the AI is about this role mapping, based on how clearly your described tasks, tools, and domain align with the role profile. Exploration unlocks at higher confidence.
+            <InfoTip title="How sure we are" source={SOURCE.framework}>
+              How confident we are about this role, based on how clearly your tasks, tools, and field point to it. The clearer you are, the higher it goes.
             </InfoTip>
           </div>
         </div>
@@ -840,23 +871,23 @@ function DiscoveryPanel({ conversation, status, roleCount, onExplore, aiAnalyzin
       </div>
       {conversation.evidence_summary.length ? (
         <div className="mt-4">
-          <div className="text-xs font-semibold text-muted">Signals heard</div>
+          <div className="text-xs font-semibold text-muted">What we heard</div>
           <div className="mt-2 flex flex-wrap gap-1.5">{conversation.evidence_summary.map((item, index) => <Chip key={`${item}-${index}`}>{item}</Chip>)}</div>
         </div>
       ) : null}
       {skills.length ? (
         <div className="mt-4">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-            Skills inferred (<Term term="TSC" /> / <Term term="CCS" />)
-            <InfoTip title="How skills are inferred" source={SOURCE.unique}>
-              The AI reads your conversation and matches what you actually do to official SkillsFuture skills, grounded only in the Unique Skills List. Each skill carries an inferred proficiency level (1–5) used for gap analysis.
+            Skills we spotted
+            <InfoTip title="How we find your skills" source={SOURCE.unique}>
+              We read your conversation and match what you actually do to official SkillsFuture skills — both technical (<Term term="TSC" />) and core workplace ones (<Term term="CCS" />). Each gets an estimated level (1–5) used to measure gaps.
             </InfoTip>
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5">{skills.map((skill, index) => <Chip key={`${skill}-${index}`} tone="brand">{skill}</Chip>)}</div>
         </div>
       ) : null}
       <Button onClick={onExplore} disabled={!canExplore} className="mt-5 w-full" icon={<ArrowRight size={16} />}>
-        {conversation.ready_to_explore ? "Explore roles to transition into" : canExplore ? "Explore roles from here" : "Share a little more to explore roles"}
+        {conversation.ready_to_explore ? "See roles I could move into" : canExplore ? "See roles from here" : "Tell me a bit more first"}
       </Button>
     </Card>
   );
@@ -888,19 +919,19 @@ function RoleExplorer({ profile, recommendations, onBack, onChoose, busy }: { pr
   const topScore = Math.round((recommendations[0]?.match_score || 0) * 100);
   return (
     <div>
-      <PageHeader eyebrow="Step 2 · Roles" title="Roles you could move into" subtitle="Expand a group and browse matches one at a time. Ranked by SkillsFuture skill overlap, TSC gaps, and transition realism." action={<BackButton onClick={onBack} />} />
+      <PageHeader eyebrow="Step 2 · Pick a direction" title="Roles you could move into" subtitle="Pick a role to aim for. Some stay close to your field, others are a fresh start — open one to see the details." action={<BackButton onClick={onBack} />} />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_336px]">
         <div className="space-y-5">
           <CareerIdentity profile={profile} topScore={topScore} />
-          <DomainGroup title="Same-domain roles" hint="Closest pathway" items={same.length ? same : recommendations} onChoose={onChoose} busy={busy} defaultOpen />
-          <DomainGroup title="Cross-domain roles" hint="Pivot options" items={cross} onChoose={onChoose} busy={busy} />
+          <DomainGroup title="Roles close to your field" hint="Usually an easier move" items={same.length ? same : recommendations} onChoose={onChoose} busy={busy} defaultOpen />
+          <DomainGroup title="A fresh direction" hint="A bigger change" items={cross} onChoose={onChoose} busy={busy} />
         </div>
         <InsightsRail
-          title="How to read this"
+          title="How to use this"
           items={[
-            "Open a role to inspect missing TSCs and proficiency gaps.",
-            "Same-domain roles are usually faster moves; cross-domain pivots may need a stronger proof project.",
-            "After picking a role, scrape job openings to see real tool demand.",
+            "Open a role to see what you'd need to learn.",
+            "Roles close to your field are usually quicker to reach; a fresh direction may take more proof.",
+            "Once you pick one, you'll see real job openings for it.",
           ]}
         />
       </div>
@@ -914,22 +945,21 @@ function CareerIdentity({ profile, topScore }: { profile: Profile | null; topSco
     <Card className="overflow-hidden border-brand/15 bg-gradient-to-br from-brandSofter via-surface to-brandSoft">
       <div className="grid gap-5 lg:grid-cols-[1fr_220px]">
         <div>
-          <SectionLabel icon={<BadgeCheck size={15} />}>Your career identity</SectionLabel>
-          <h2 className="mt-2.5 text-2xl font-bold tracking-tight text-ink md:text-[28px]">{profile?.role.role_title || "Working profile"}</h2>
+          <SectionLabel icon={<BadgeCheck size={15} />}>Your starting point</SectionLabel>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-            {profile ? `Mapped from your conversation to ${profile.role.sector} · ${profile.role.track}.` : "Complete the conversation to create your first SkillsFuture-backed profile."}
+            {profile ? `We mapped your work to ${profile.role.role_title} (${profile.role.sector}). These are the skills we found you already have:` : "Complete the conversation to build your profile."}
           </p>
-          <div className="mt-4 flex flex-wrap gap-1.5">{skills.map((skill, index) => <Chip key={`${skill}-${index}`}>{skill}</Chip>)}</div>
+          <div className="mt-3 flex flex-wrap gap-1.5">{skills.map((skill, index) => <Chip key={`${skill}-${index}`} tone="brand">{skill}</Chip>)}</div>
         </div>
         <div className="flex flex-col justify-center rounded-xl border border-line bg-surface/70 p-4">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted">
-            Opportunity score
-            <InfoTip title="How this score is computed" source={SOURCE.framework}>
-              The best-matching target role's overlap between your inferred skills and that role's required TSC/CCS skills (weighted by proficiency level). Higher means a shorter, more realistic transition.
+            Best match found
+            <InfoTip title="What this means" source={SOURCE.framework}>
+              How well your current skills line up with the closest role below. Higher means a shorter, more realistic move.
             </InfoTip>
           </div>
-          <div className="mt-1.5 text-4xl font-bold tracking-tight text-brand">{topScore || 0}<span className="text-xl text-muted">/100</span></div>
-          <p className="mt-1.5 text-xs leading-5 text-muted">Transferable skills vs. missing high-priority TSCs.</p>
+          <div className="mt-1.5 text-4xl font-bold tracking-tight text-brand">{topScore || 0}<span className="text-xl text-muted">%</span></div>
+          <p className="mt-1.5 text-xs leading-5 text-muted">Based on skills you already have vs. what these roles need.</p>
         </div>
       </div>
     </Card>
@@ -1005,19 +1035,19 @@ function RoleMatchCard({ item, onChoose, busy }: { item: Recommendation; onChoos
         <div className="flex items-center gap-1.5">
           <MatchChip value={Math.round(item.match_score * 100)} />
           <InfoTip title="Why this role & match" source={SOURCE.framework}>
-            {item.ai_rationale || item.tier_note} The match score reflects overlap between your inferred skills and this role's required TSC/CCS skills; tier "{item.tier}" reflects how big the jump is.
+            {item.ai_rationale || item.tier_note} The match shows how much of what this role needs you already have.
           </InfoTip>
         </div>
       </div>
       <p className="mt-3 text-sm leading-6 text-body">{item.ai_rationale || item.tier_note}</p>
       {item.required_skills?.length ? (
         <div className="mt-4">
-          <div className="mb-1.5 text-xs font-semibold text-muted">Likely required</div>
+          <div className="mb-1.5 text-xs font-semibold text-muted">Skills this role uses</div>
           <div className="flex flex-wrap gap-1.5">{item.required_skills.slice(0, 6).map((skill, index) => <Chip key={`${item.role.role_id}-req-${skill}-${index}`}>{skill}</Chip>)}</div>
         </div>
       ) : null}
       <div className="mt-4">
-        <div className="mb-1.5 text-xs font-semibold text-muted">Practical gaps</div>
+        <div className="mb-1.5 text-xs font-semibold text-muted">What you'd need to build</div>
         <div className="flex flex-wrap gap-1.5">
           {(item.practical_gap_skills?.length ? item.practical_gap_skills.map((gap) => gap.skill) : item.top_missing_skills.map((skill) => skill.canonical_title)).slice(0, 5).map((skill, index) => (
             <Chip key={`${item.role.role_id}-gap-${skill}-${index}`} tone="warn">{skill}</Chip>
@@ -1025,7 +1055,7 @@ function RoleMatchCard({ item, onChoose, busy }: { item: Recommendation; onChoos
         </div>
       </div>
       <Button onClick={() => onChoose(item)} disabled={busy} className="mt-5 w-full" icon={<ArrowRight size={16} />}>
-        Explore career pathway
+        Choose this role
       </Button>
     </div>
   );
@@ -1075,25 +1105,23 @@ function RoleDetail({ selected, gap, onBack, onJobs, onPlan, busy, onReanalyse }
 
   return (
     <div>
-      <PageHeader eyebrow="Step 2 · Gap analysis" title={selected.role.role_title} subtitle="What you'd need to build to move into this role — one skill at a time." action={<BackButton onClick={onBack} />} />
+      <PageHeader eyebrow="Step 2 · See the gap" title={`Becoming a ${selected.role.role_title}`} subtitle="Here's how close you already are, and the skills you'd need to build to get there." action={<BackButton onClick={onBack} />} />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_336px]">
         <div className="space-y-5">
           {/* Readiness summary — donut + collapsible AI explanation */}
           <Card>
             <div className="grid gap-5 md:grid-cols-[160px_1fr] md:items-center">
-              <Donut value={match} label="Match" />
+              <Donut value={match} label="ready" />
               <div>
                 <div className="flex items-center gap-1.5">
-                  <h2 className="text-lg font-bold text-ink">Transition readiness</h2>
-                  <InfoTip title="How the match is computed" source={SOURCE.framework}>
-                    Your inferred skills are compared against this role's official required TSC/CCS skills and proficiency levels. The donut shows direct matches; weighted overlap credits partial proficiency. The checklist below is the skills this role needs that you haven't shown yet.
+                  <h2 className="text-lg font-bold text-ink">How ready you are</h2>
+                  <InfoTip title="What this means" source={SOURCE.framework}>
+                    We compared the skills you already have against what this role officially needs. The circle shows how much already overlaps — the checklist below is what's still missing.
                   </InfoTip>
                 </div>
-                <CollapsibleText text={gap.ai_summary || `You have a ${match}% direct skill match. The skills below are your best targets for a short proof project and course plan.`} />
+                <CollapsibleText text={gap.ai_summary || `You're about ${match}% of the way there. The skills below are your best targets for a short project and a course plan.`} />
                 <div className="mt-4 flex flex-wrap gap-1.5">
                   <TierBadge tier={selected.tier} />
-                  <Chip>{Math.round(gap.weighted_overlap * 100)}% weighted overlap</Chip>
-                  {gap.analysis_mode ? <Chip tone={gap.analysis_mode === "openai_catalog" ? "brand" : "neutral"}>{gap.analysis_mode === "openai_catalog" ? "AI + catalog" : "Fallback"}</Chip> : null}
                 </div>
               </div>
             </div>
@@ -1251,9 +1279,9 @@ function MarketView({ selected, market, onBack, onPlan, busy, onReanalyse }: { s
   return (
     <div>
       <PageHeader
-        eyebrow="Step 3 · Jobs"
-        title="Job openings & skill demand"
-        subtitle={`Live openings and real employer demand for ${selected.role.role_title}.`}
+        eyebrow="Step 3 · Check it's real"
+        title="Real jobs & what employers want"
+        subtitle={`Actual openings for ${selected.role.role_title}, and the skills they ask for most.`}
         action={
           <div className="flex items-center gap-2">
             <ApifyBadge live={market.mode === "apify"} />
@@ -1410,7 +1438,7 @@ function MarketView({ selected, market, onBack, onPlan, busy, onReanalyse }: { s
 function PlanView({ plan, courses, onBack, onExploreMore }: { plan: Plan; courses: CourseSearch | null; onBack: () => void; onExploreMore: () => void }) {
   return (
     <div>
-      <PageHeader eyebrow="Step 4 · Plan" title="Your courses and 30-day plan" subtitle="A simple week-by-week plan with real things to do, plus courses matched to the skills you need." action={<BackButton onClick={onBack} />} />
+      <PageHeader eyebrow="Step 4 · Your plan" title="Your 30-day plan to get there" subtitle="A simple week-by-week plan with real things to do, plus courses matched to the skills you need." action={<BackButton onClick={onBack} />} />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-5">
           <Card className="border-brand/15 bg-gradient-to-br from-brandSofter via-surface to-brandSoft">
@@ -1723,5 +1751,6 @@ function MatchChip({ value }: { value: number }) {
 
 function TierBadge({ tier }: { tier: "Adjacent" | "Stretch" | "Pivot" }) {
   const tone = tier === "Adjacent" ? "brand" : tier === "Stretch" ? "violet" : "warn";
-  return <Chip tone={tone as "brand" | "violet" | "warn"}>{tier}</Chip>;
+  const label = tier === "Adjacent" ? "Easier move" : tier === "Stretch" ? "Bigger stretch" : "Career switch";
+  return <Chip tone={tone as "brand" | "violet" | "warn"}>{label}</Chip>;
 }
