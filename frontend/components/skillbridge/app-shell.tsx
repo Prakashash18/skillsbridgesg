@@ -276,7 +276,7 @@ export function SkillBridgeApp() {
       {transition ? <LoadingHUD transition={transition} skillNames={skillNames} /> : null}
       <TopBar status={status} />
       <Stepper current={stage} enabled={navEnabled} onStage={goTo} />
-      <div className="mx-auto w-full max-w-[1240px] px-4 pb-4 pt-6 md:px-8">
+      <div className="mx-auto w-full max-w-[1240px] px-3 pb-4 pt-6 sm:px-4 md:px-8">
         {error ? (
           <div className="mb-5 flex items-start gap-3 rounded-xl border border-danger/20 bg-dangerSoft px-4 py-3 text-sm font-medium text-danger">
             <span className="mt-0.5">⚠</span>
@@ -615,7 +615,7 @@ function Intake(props: {
       <div className="grid gap-4 lg:h-[calc(100dvh-184px)] lg:grid-cols-[minmax(0,1fr)_360px]">
         {/* Chat panel — fills the viewport so messages get the most room */}
         <Card className={`h-[calc(100dvh-240px)] flex-col overflow-hidden p-0 lg:h-full ${mobileView === "insights" ? "hidden lg:flex" : "flex"}`}>
-        <div className="flex shrink-0 items-center gap-2.5 border-b border-line px-4 py-2.5">
+        <div className="flex shrink-0 items-center gap-2.5 border-b border-line px-3 py-2.5 sm:px-4">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brandSoft text-brand">
             <Bot size={17} />
           </div>
@@ -634,7 +634,7 @@ function Intake(props: {
 
         <div className="flex min-h-0 flex-1 flex-col">
           {/* Messages */}
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+          <div className="min-h-0 flex-1 space-y-3.5 overflow-y-auto px-2.5 py-4 sm:px-4">
             {props.messages.map((message, index) => (
               <ChatBubble key={`${message.role}-${index}`} message={message} />
             ))}
@@ -643,7 +643,7 @@ function Intake(props: {
           </div>
 
           {/* Input area — compact: chips scroll in one row, upload inline */}
-          <div className="shrink-0 border-t border-line px-3 py-2.5 md:px-4">
+          <div className="shrink-0 border-t border-line px-2.5 py-2.5 sm:px-4">
             {/* Quick replies / starters — single scrollable row, no wrap */}
             {showQuickReplies ? (
               <div className="mb-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -680,9 +680,9 @@ function Intake(props: {
                 value={props.draft}
                 onChange={(e) => props.onDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); props.onSend(); } }}
-                placeholder="Type your reply, or tap a chip above…"
+                placeholder="Type your reply…"
                 rows={1}
-                className="max-h-28 min-h-[36px] flex-1 resize-none bg-transparent px-1 py-2 text-sm leading-6 outline-none placeholder:text-faint"
+                className="max-h-28 min-h-[36px] flex-1 resize-none bg-transparent px-1 py-2 text-[15px] leading-6 outline-none placeholder:text-faint sm:text-sm"
               />
               <button
                 disabled={props.busy}
@@ -937,14 +937,15 @@ function ChatThinking() {
 function ChatBubble({ message }: { message: ChatMessage }) {
   const user = message.role === "user";
   return (
-    <div className={`flex items-end gap-2.5 ${user ? "justify-end" : "justify-start"}`}>
+    <div className={`flex items-end gap-2 ${user ? "justify-end" : "justify-start"}`}>
+      {/* Avatar only from sm+ — on phones it just steals width from the message */}
       {!user ? (
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brandSoft text-brand">
+        <div className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brandSoft text-brand sm:flex">
           <Bot size={15} />
         </div>
       ) : null}
       <div
-        className={`max-w-[86%] whitespace-pre-line rounded-2xl px-4 py-3 text-[14.5px] leading-6 md:max-w-[78%] ${
+        className={`max-w-[94%] whitespace-pre-line rounded-2xl px-3.5 py-2.5 text-[15px] leading-[1.55] sm:max-w-[86%] sm:px-4 sm:py-3 sm:text-[14.5px] md:max-w-[78%] ${
           user ? "rounded-br-md bg-gradient-to-b from-brand to-brandStrong text-white shadow-card" : "rounded-bl-md border border-line bg-surface text-ink shadow-card"
         }`}
       >
