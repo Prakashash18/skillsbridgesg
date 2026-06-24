@@ -52,11 +52,13 @@ def validate_market(target_role_id: str, location: str = "Singapore", max_jobs: 
     notice = "Demo mode: using sample job postings."
     postings: list[JobPosting] = []
     if use_apify:
-        live = _fetch_apify_jobs(role.role_title, location, max_jobs)
+        live, reason = _fetch_apify_jobs(role.role_title, location, max_jobs)
         if live:
             postings = live
             mode = "apify"
             notice = f"Live Google Jobs results via Apify for '{role.role_title}' in {location}."
+        elif reason == "credit_exhausted":
+            notice = "Apify usage limit reached — the live job-scraping credit is used up, so we're showing sample postings. Live results will return once Apify credit refreshes."
         else:
             notice = "Live job search did not return results just now — showing sample postings instead."
     if not postings:
@@ -102,12 +104,14 @@ def validate_market(target_role_id: str, location: str = "Singapore", max_jobs: 
     )
 
 
-def _fetch_apify_jobs(role_title: str, location: str, max_jobs: int) -> list[JobPosting] | None:
+def _fetch_apify_jobs(role_title: str, location: str, max_jobs: int) -> tuple[list[JobPosting] | None, str | None]:
     """Call the Apify Google Jobs scraper and map results to JobPostings.
-    Returns None on any failure so the caller can fall back to demo postings."""
+    Returns (postings, reason). On failure postings is None and reason explains
+    why (e.g. 'credit_exhausted', 'no_token', 'http_error', 'no_results') so the
+    caller can show an honest notice and fall back to demo postings."""
     token = os.getenv("APIFY_TOKEN")
     if not token:
-        return None
+        return None, "no_token"
     actor = (os.getenv("APIFY_ACTOR_ID") or DEFAULT_APIFY_ACTOR).strip()
     # Apify REST addresses actors with '~' instead of '/'.
     actor_path = actor.replace("/", "~")
@@ -125,12 +129,18 @@ def _fetch_apify_jobs(role_title: str, location: str, max_jobs: int) -> list[Job
                 params={"token": token, "maxItems": max_jobs},
                 json=payload,
             )
+            # A 402 means the Apify account is out of usage credit for this paid
+            # actor — surface that distinctly so the UI can say so plainly.
+            if response.status_code == 402:
+                print("[apify] credit exhausted (HTTP 402):", response.text[:300])
+                return None, "credit_exhausted"
             response.raise_for_status()
             items = response.json()
-    except Exception:
-        return None
+    except Exception as exc:
+        print("[apify] request failed:", type(exc).__name__, str(exc)[:300])
+        return None, "http_error"
     if not isinstance(items, list):
-        return None
+        return None, "http_error"
     postings: list[JobPosting] = []
     for item in items:
         if not isinstance(item, dict):
@@ -160,7 +170,7 @@ def _fetch_apify_jobs(role_title: str, location: str, max_jobs: int) -> list[Job
         )
         if len(postings) >= max_jobs:
             break
-    return postings or None
+    return (postings, None) if postings else (None, "no_results")
 
 
 def _first(item: dict, *keys: str) -> str:

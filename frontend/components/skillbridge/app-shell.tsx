@@ -567,127 +567,116 @@ function Intake(props: {
   }, [props.messages, props.busy]);
 
   return (
-    <div>
-      <PageHeader
-        eyebrow="Step 1 · Conversation"
-        title="Let's map your current role"
-        subtitle="Chat with the AI or upload your resume PDF. It finds your role and maps it to SkillsFuture skills."
-      />
-      <div className="grid gap-5 lg:h-[calc(100dvh-260px)] lg:grid-cols-[minmax(0,1fr)_372px]">
-        {/* Chat panel */}
-        <Card className="flex h-[68vh] flex-col overflow-hidden p-0 lg:h-full">
-          <div className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brandSoft text-brand">
-              <Bot size={20} />
+    <div className="grid gap-4 lg:h-[calc(100dvh-184px)] lg:grid-cols-[minmax(0,1fr)_360px]">
+      {/* Chat panel — fills the viewport so messages get the most room */}
+      <Card className="flex h-[calc(100dvh-184px)] flex-col overflow-hidden p-0 lg:h-full">
+        <div className="flex shrink-0 items-center gap-2.5 border-b border-line px-4 py-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brandSoft text-brand">
+            <Bot size={17} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-bold leading-4 text-ink">SkillBridge AI</div>
+            <div className="mt-0.5 flex items-center gap-1.5 text-[11px] font-medium text-muted">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brandRing opacity-60" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand" />
+              </span>
+              {props.aiAnalyzing ? "Analyzing…" : "Online · ready"}
             </div>
-            <div>
-              <div className="text-sm font-bold text-ink">SkillBridge AI</div>
-              <div className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-muted">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brandRing opacity-60" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-brand" />
+          </div>
+          <OpenAIBadge conversation={props.conversation} />
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col">
+          {/* Messages */}
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+            {props.messages.map((message, index) => (
+              <ChatBubble key={`${message.role}-${index}`} message={message} />
+            ))}
+            {props.busy ? (
+              <div className="flex items-center gap-2 text-sm font-medium text-muted">
+                <Loader2 className="animate-spin text-brand" size={15} />
+                Reading your profile signals…
+              </div>
+            ) : null}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input area — compact: chips scroll in one row, upload inline */}
+          <div className="shrink-0 border-t border-line px-3 py-2.5 md:px-4">
+            {/* Quick replies / starters — single scrollable row, no wrap */}
+            {showQuickReplies ? (
+              <div className="mb-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {props.suggestedReplies.map((reply) => (
+                  <button key={reply} disabled={props.busy} onClick={() => props.onQuickReply(reply)}
+                    className="shrink-0 whitespace-nowrap rounded-full border border-brand/20 bg-brandSoft px-3 py-1.5 text-xs font-semibold text-brand transition hover:bg-brand hover:text-white disabled:opacity-50">
+                    {reply}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="mb-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {starterPrompts.map((prompt) => (
+                  <button key={prompt} onClick={() => props.onDraft(prompt)}
+                    className="shrink-0 whitespace-nowrap rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-medium text-body transition hover:border-brandRing hover:text-brand">
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-end gap-2 rounded-2xl border border-line bg-subtle p-1.5 transition focus-within:border-brandRing focus-within:bg-surface">
+              <input ref={fileInputRef} type="file" accept=".pdf" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) props.onPdfUpload(f); e.target.value = ""; }} />
+              <button
+                disabled={props.busy}
+                onClick={() => fileInputRef.current?.click()}
+                title="Upload resume PDF"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-brandSoft hover:text-brand disabled:opacity-40"
+              >
+                <Upload size={17} />
+              </button>
+              <textarea
+                value={props.draft}
+                onChange={(e) => props.onDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); props.onSend(); } }}
+                placeholder="Type your reply, or tap a chip above…"
+                rows={1}
+                className="max-h-28 min-h-[36px] flex-1 resize-none bg-transparent px-1 py-2 text-sm leading-6 outline-none placeholder:text-faint"
+              />
+              <button
+                disabled={props.busy}
+                onClick={props.onSend}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-b from-brand to-brandStrong text-white shadow-card transition hover:brightness-110 active:scale-95 disabled:opacity-40"
+              >
+                <Send size={16} />
+              </button>
+            </div>
+
+            {/* Helper row: LinkedIn link + parse status */}
+            <div className="mt-1.5 flex items-center gap-2 px-1">
+              <button
+                onClick={() => setShowLinkedInGuide((v) => !v)}
+                className="inline-flex items-center gap-0.5 text-[11px] font-medium text-muted transition hover:text-brand"
+              >
+                How to export a LinkedIn PDF {showLinkedInGuide ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+              </button>
+              {props.resumeParseStatus ? (
+                <span className={`ml-auto truncate text-[11px] font-medium ${props.resumeParseStatus.includes("fail") || props.resumeParseStatus.includes("error") ? "text-warn" : "text-brand"}`}>
+                  {props.resumeParseStatus}
                 </span>
-                {props.aiAnalyzing ? "Analyzing…" : "Online · ready"}
-              </div>
-            </div>
-            <OpenAIBadge conversation={props.conversation} />
-          </div>
-
-          <div className="flex min-h-0 flex-1 flex-col">
-            {/* Messages */}
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-6">
-              {props.messages.map((message, index) => (
-                <ChatBubble key={`${message.role}-${index}`} message={message} />
-              ))}
-              {props.busy ? (
-                <div className="flex items-center gap-2.5 text-sm font-medium text-muted">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brandSoft text-brand">
-                    <Loader2 className="animate-spin" size={15} />
-                  </span>
-                  Reading your profile signals…
-                </div>
               ) : null}
-              <div ref={messagesEndRef} />
             </div>
 
-            {/* Input area */}
-            <div className="shrink-0 border-t border-line px-5 py-4">
-              <div className="flex items-end gap-2 rounded-2xl border border-line bg-subtle p-2 transition focus-within:border-brandRing focus-within:bg-surface">
-                <textarea
-                  value={props.draft}
-                  onChange={(e) => props.onDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); props.onSend(); } }}
-                  placeholder="Tell me your title, who you serve, weekly work, tools, and outcomes…"
-                  className="min-h-[52px] flex-1 resize-none bg-transparent px-3 py-2 text-sm leading-6 outline-none placeholder:text-faint"
-                />
-                <button
-                  disabled={props.busy}
-                  onClick={props.onSend}
-                  className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-b from-brand to-brandStrong text-white shadow-card transition hover:brightness-110 active:scale-95 disabled:opacity-40"
-                >
-                  <Send size={17} />
-                </button>
-              </div>
-
-              {/* Quick replies or starter prompts */}
-              {showQuickReplies ? (
-                <div className="mt-3">
-                  <div className="mb-1.5 text-xs font-medium text-muted">Quick replies — tap to answer or type your own</div>
-                  <div className="flex flex-wrap gap-2">
-                    {props.suggestedReplies.map((reply) => (
-                      <button key={reply} disabled={props.busy} onClick={() => props.onQuickReply(reply)}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-brand/20 bg-brandSoft px-3 py-1.5 text-xs font-semibold text-brand transition hover:bg-brand hover:text-white disabled:opacity-50">
-                        {reply}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {starterPrompts.map((prompt) => (
-                    <button key={prompt} onClick={() => props.onDraft(prompt)}
-                      className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-medium text-body transition hover:border-brandRing hover:text-brand">
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* PDF upload strip */}
-              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
-                <input ref={fileInputRef} type="file" accept=".pdf" className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) props.onPdfUpload(f); e.target.value = ""; }} />
-                <button
-                  disabled={props.busy}
-                  onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-body transition hover:border-brandRing hover:text-brand disabled:opacity-50"
-                >
-                  <Upload size={13} /> Upload resume PDF
-                </button>
-                <button
-                  onClick={() => setShowLinkedInGuide((v) => !v)}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:text-brandStrong"
-                >
-                  How to get LinkedIn PDF {showLinkedInGuide ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                </button>
-                {props.resumeParseStatus ? (
-                  <span className={`ml-auto text-xs font-medium ${props.resumeParseStatus.includes("fail") || props.resumeParseStatus.includes("error") ? "text-warn" : "text-brand"}`}>
-                    {props.resumeParseStatus}
-                  </span>
-                ) : null}
-              </div>
-
-              {/* LinkedIn guide */}
-              {showLinkedInGuide ? <LinkedInGuide /> : null}
-            </div>
+            {showLinkedInGuide ? <LinkedInGuide /> : null}
           </div>
-        </Card>
+        </div>
+      </Card>
 
-        {/* Sidebar: discovery panel only */}
-        <aside className="lg:h-full lg:min-h-0">
-          <DiscoveryPanel className="h-full overflow-y-auto" conversation={props.conversation} status={props.status} roleCount={props.roleCount} onExplore={props.onExplore} aiAnalyzing={props.aiAnalyzing} />
-        </aside>
-      </div>
+      {/* Sidebar: discovery panel only */}
+      <aside className="lg:h-full lg:min-h-0">
+        <DiscoveryPanel className="h-full overflow-y-auto" conversation={props.conversation} status={props.status} roleCount={props.roleCount} onExplore={props.onExplore} aiAnalyzing={props.aiAnalyzing} />
+      </aside>
     </div>
   );
 }
@@ -713,6 +702,31 @@ function OpenAIBadge({ conversation }: { conversation: ProfileConversation | nul
       <OpenAILogo className="h-3.5 w-3.5 text-ink" />
       <span className="text-muted">Powered by</span>
       <span className="text-ink">OpenAI {model}</span>
+    </span>
+  );
+}
+
+function ApifyMark({ className = "" }: { className?: string }) {
+  // Apify-green hexagon logomark.
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <path d="M12 1.5l9.09 5.25v10.5L12 22.5l-9.09-5.25V6.75L12 1.5z" fill="#97CA3F" />
+      <path d="M12 6.2l5.02 2.9v5.8L12 17.8l-5.02-2.9V9.1L12 6.2z" fill="#fff" fillOpacity="0.92" />
+      <circle cx="12" cy="12" r="1.7" fill="#5b8a1f" />
+    </svg>
+  );
+}
+
+function ApifyBadge({ live }: { live: boolean }) {
+  return (
+    <span
+      title={live ? "Live jobs scraped via Apify Google Jobs" : "Powered by Apify — live scraping resumes when credit is available"}
+      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1.5 text-[11px] font-semibold text-body"
+    >
+      <ApifyMark className="h-3.5 w-3.5" />
+      <span className="text-muted">Powered by</span>
+      <span className="text-ink">Apify</span>
+      {live ? <span className="rounded-full bg-brandSoft px-1.5 py-0.5 text-[10px] font-bold uppercase text-brand">Live</span> : null}
     </span>
   );
 }
@@ -1236,14 +1250,26 @@ function MarketView({ selected, market, onBack, onPlan, busy, onReanalyse }: { s
 
   return (
     <div>
-      <PageHeader eyebrow="Step 3 · Jobs" title="Job openings & skill demand" subtitle={`Live openings and real employer demand for ${selected.role.role_title}.`} action={<BackButton onClick={onBack} />} />
+      <PageHeader
+        eyebrow="Step 3 · Jobs"
+        title="Job openings & skill demand"
+        subtitle={`Live openings and real employer demand for ${selected.role.role_title}.`}
+        action={
+          <div className="flex items-center gap-2">
+            <ApifyBadge live={market.mode === "apify"} />
+            <BackButton onClick={onBack} />
+          </div>
+        }
+      />
       {market.notice ? (
-        <div className={`mb-4 flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium ${market.mode === "apify" ? "border-brand/25 bg-brandSoft text-brand" : "border-line bg-subtle text-muted"}`}>
+        <div className={`mb-4 flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium ${market.mode === "apify" ? "border-brand/25 bg-brandSoft text-brand" : "border-amber-300/60 bg-amber-50 text-amber-700"}`}>
           {market.mode === "apify" ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-coral px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+            <span className="mt-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-coral px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
               <span className="h-1.5 w-1.5 rounded-full bg-white" /> Live
             </span>
-          ) : null}
+          ) : (
+            <ApifyMark className="mt-0.5 h-4 w-4 shrink-0" />
+          )}
           {market.notice}
         </div>
       ) : null}
