@@ -34,7 +34,7 @@ import {
   Upload,
   User,
 } from "lucide-react";
-import { api, ChatMessage, CourseSearch, GapAnalysis, Market, Plan, Profile, ProfileConversation, Recommendation, Role } from "@/lib/api";
+import { api, ChatMessage, CourseRecommendation, CourseSearch, GapAnalysis, Market, Plan, Profile, ProfileConversation, Recommendation, Role } from "@/lib/api";
 
 type Stage = "intake" | "roles" | "role" | "market" | "plan";
 
@@ -329,7 +329,7 @@ export function SkillBridgeApp() {
 
 function JourneyBanner({ currentRole, targetRole, match }: { currentRole: string; targetRole?: string; match?: number }) {
   return (
-    <div className="mb-5 flex items-center gap-3 rounded-2xl border border-line bg-gradient-to-r from-surface via-surface to-brandSofter px-4 py-3 shadow-card sm:gap-4 sm:px-5">
+    <div className="animate-rise mb-5 flex items-center gap-3 rounded-2xl border border-line bg-gradient-to-r from-surface via-surface to-brandSofter px-4 py-3 shadow-card sm:gap-4 sm:px-5">
       <div className="min-w-0 flex-1">
         <div className="text-[10px] font-bold uppercase tracking-wide text-muted">You are</div>
         <div className="truncate text-sm font-bold text-ink sm:text-base">{currentRole}</div>
@@ -342,7 +342,7 @@ function JourneyBanner({ currentRole, targetRole, match }: { currentRole: string
         <div className="truncate text-sm font-bold text-ink sm:text-base">{targetRole || "Choosing your next role…"}</div>
       </div>
       {match != null && targetRole ? (
-        <div className="ml-1 hidden shrink-0 flex-col items-center rounded-xl bg-brandSoft px-3 py-1.5 text-center sm:flex">
+        <div className="animate-pop ml-1 hidden shrink-0 flex-col items-center rounded-xl bg-brandSoft px-3 py-1.5 text-center sm:flex">
           <span className="text-lg font-bold leading-5 text-brand">{match}%</span>
           <span className="text-[10px] font-semibold text-brand/70">match</span>
         </div>
@@ -963,7 +963,7 @@ function RoleExplorer({ profile, recommendations, onBack, onChoose, busy }: { pr
     <div>
       <PageHeader eyebrow="Step 2 · Pick a direction" title="Roles you could move into" subtitle="Pick a role to aim for. Some stay close to your field, others are a fresh start — open one to see the details." action={<BackButton onClick={onBack} />} />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_336px]">
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <CareerIdentity profile={profile} topScore={topScore} />
           <DomainGroup title="Roles close to your field" hint="Usually an easier move" items={same.length ? same : recommendations} onChoose={onChoose} busy={busy} defaultOpen />
           <DomainGroup title="A fresh direction" hint="A bigger change" items={cross} onChoose={onChoose} busy={busy} />
@@ -1149,7 +1149,7 @@ function RoleDetail({ selected, gap, onBack, onJobs, onPlan, busy, onReanalyse }
     <div>
       <PageHeader eyebrow="Step 2 · See the gap" title={`Becoming a ${selected.role.role_title}`} subtitle="Here's how close you already are, and the skills you'd need to build to get there." action={<BackButton onClick={onBack} />} />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_336px]">
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           {/* Readiness summary — donut + collapsible AI explanation */}
           <Card>
             <div className="grid gap-5 md:grid-cols-[160px_1fr] md:items-center">
@@ -1344,7 +1344,7 @@ function MarketView({ selected, market, onBack, onPlan, busy, onReanalyse }: { s
         </div>
       ) : null}
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {/* Collapsible job list */}
           <Card className="p-0 overflow-hidden">
             <div className="px-5 py-4 border-b border-line">
@@ -1477,59 +1477,159 @@ function MarketView({ selected, market, onBack, onPlan, busy, onReanalyse }: { s
   );
 }
 
+/** Which of the user's focus-skill gaps a course actually helps close. */
+function courseGapMatches(course: CourseRecommendation, focusSkills: string[]): string[] {
+  const haystack = `${course.skills.join(" ")} ${course.title} ${course.reason}`.toLowerCase();
+  const matched: string[] = [];
+  for (const focus of focusSkills) {
+    const key = focus.toLowerCase().trim();
+    if (!key) continue;
+    const words = key.split(/\s+/).filter((w) => w.length > 3);
+    const hit = haystack.includes(key) || words.some((w) => haystack.includes(w));
+    if (hit) matched.push(focus);
+  }
+  return matched;
+}
+
+function buildPlanExport(plan: Plan, courses: CourseSearch | null): string {
+  const lines: string[] = [];
+  lines.push(`# My 30-day plan — becoming a ${plan.target_role.role_title}`, "");
+  lines.push(`Focus skills: ${plan.focus_skills.join(", ") || "—"}`, "");
+  lines.push(`> ${plan.honesty_line}`, "");
+  lines.push("## Weekly plan");
+  for (const week of plan.weekly_plan) {
+    lines.push("", `### Week ${week.week} — ${week.theme}`);
+    for (const task of week.tasks) lines.push(`- [ ] ${task}`);
+  }
+  lines.push("", "## Prove your skills");
+  lines.push(`- Mini project: ${plan.mini_project}`);
+  lines.push(`- Portfolio piece: ${plan.final_portfolio_task}`);
+  if (courses?.courses.length) {
+    lines.push("", "## Courses to close your gaps");
+    for (const course of courses.courses) {
+      const gaps = courseGapMatches(course, plan.focus_skills);
+      lines.push("", `### ${course.title} — ${course.provider}`);
+      lines.push(course.url);
+      if (gaps.length) lines.push(`Closes: ${gaps.join(", ")}`);
+      if (course.reason) lines.push(`Why it helps: ${course.reason}`);
+    }
+  }
+  lines.push("", `Generated by SkillBridge SG · ${new Date().toLocaleDateString()}`);
+  return lines.join("\n");
+}
+
 function PlanView({ plan, courses, onBack, onExploreMore }: { plan: Plan; courses: CourseSearch | null; onBack: () => void; onExploreMore: () => void }) {
+  const [openWeek, setOpenWeek] = useState<number>(plan.weekly_plan[0]?.week ?? 1);
+  const [copied, setCopied] = useState(false);
+
+  const exportText = useMemo(() => buildPlanExport(plan, courses), [plan, courses]);
+
+  function downloadPlan() {
+    const blob = new Blob([exportText], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `skillbridge-plan-${plan.target_role.role_title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  async function copyPlan() {
+    try {
+      await navigator.clipboard.writeText(exportText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard may be blocked; download is the fallback */
+    }
+  }
+
   return (
     <div>
-      <PageHeader eyebrow="Step 4 · Your plan" title="Your 30-day plan to get there" subtitle="A simple week-by-week plan with real things to do, plus courses matched to the skills you need." action={<BackButton onClick={onBack} />} />
+      <PageHeader eyebrow="Step 4 · Your plan" title="Your 30-day plan to get there" subtitle="Read it one week at a time. Each week is a few small, real actions." action={<BackButton onClick={onBack} />} />
+
+      {/* Compact overview — role + focus skills */}
+      <Card className="mb-5 animate-rise border-brand/15 bg-gradient-to-br from-brandSofter via-surface to-brandSoft">
+        <div className="grid gap-5 md:grid-cols-[120px_1fr] md:items-center">
+          <Donut value={30} label="day plan" rawLabel />
+          <div>
+            <h2 className="text-lg font-bold text-ink">Becoming a {plan.target_role.role_title}</h2>
+            <p className="mt-1.5 text-sm leading-6 text-body">{plan.honesty_line}</p>
+            <div className="mt-3 flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-muted">You'll focus on</span>
+              <InfoTip title="Why these skills" source={SOURCE.framework}>
+                These are your biggest gaps for this role — the missing skills, ranked by how much they matter and how often employers ask for them.
+              </InfoTip>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">{plan.focus_skills.map((skill, index) => <Chip key={`${skill}-${index}`} tone="brand">{skill}</Chip>)}</div>
+          </div>
+        </div>
+      </Card>
+
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-5">
-          <Card className="border-brand/15 bg-gradient-to-br from-brandSofter via-surface to-brandSoft">
-            <div className="grid gap-5 md:grid-cols-[140px_1fr] md:items-center">
-              <Donut value={30} label="day plan" rawLabel />
-              <div>
-                <h2 className="text-lg font-bold text-ink">{plan.target_role.role_title} transition</h2>
-                <p className="mt-2 text-sm leading-6 text-body">{plan.honesty_line}</p>
-                <div className="mt-3 flex items-center gap-1.5">
-                  <span className="text-xs font-semibold text-muted">Focus skills</span>
-                  <InfoTip title="Why these focus skills" source={SOURCE.framework}>
-                    Chosen from your highest-priority gaps for this role — the missing or under-proficient TSC/CCS skills, prioritised by proficiency gap and how often they appear across roles and in job postings.
-                  </InfoTip>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">{plan.focus_skills.map((skill, index) => <Chip key={`${skill}-${index}`} tone="brand">{skill}</Chip>)}</div>
-              </div>
+        <div className="min-w-0 space-y-5">
+          {/* Weekly plan — one week open at a time */}
+          <Card className="overflow-hidden p-0">
+            <div className="border-b border-line px-5 py-4">
+              <SectionLabel icon={<CalendarCheck size={15} />}>Your 4 weeks</SectionLabel>
+              <p className="mt-1 text-xs text-muted">Tap a week to see its actions. Start with Week 1.</p>
+            </div>
+            <div className="divide-y divide-line">
+              {plan.weekly_plan.map((week, index) => {
+                const open = openWeek === week.week;
+                return (
+                  <div key={week.week} className="animate-rise" style={{ animationDelay: `${index * 60}ms` }}>
+                    <button onClick={() => setOpenWeek(open ? -1 : week.week)} className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition hover:bg-subtle">
+                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition ${open ? "bg-brand text-white" : "border border-line bg-surface text-brand"}`}>
+                        {week.week}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-bold text-ink">Week {week.week}</span>
+                        <span className="block truncate text-xs text-muted">{week.theme}</span>
+                      </span>
+                      <span className="shrink-0 rounded-full bg-subtle px-2 py-0.5 text-[11px] font-semibold text-muted">{week.tasks.length} actions</span>
+                      <ChevronDown size={16} className={`shrink-0 text-muted transition ${open ? "rotate-180" : ""}`} />
+                    </button>
+                    {open ? (
+                      <ul className="animate-rise space-y-2 px-5 pb-4 pl-16 text-sm leading-6 text-body">
+                        {week.tasks.map((task, taskIndex) => (
+                          <li key={`${week.week}-${task}-${taskIndex}`} className="flex gap-2">
+                            <Check className="mt-1 shrink-0 text-brand" size={14} />
+                            {task}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
           </Card>
+
+          {/* Prove your skills — mini project + portfolio in one card */}
           <Card>
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-base font-bold text-ink">Weekly roadmap</h2>
-              <button onClick={onExploreMore} className="text-sm font-semibold text-brand hover:text-brandStrong">Explore other roles</button>
+            <SectionLabel icon={<Target size={15} />}>Prove your skills</SectionLabel>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="hover-lift rounded-xl border border-line bg-subtle p-4">
+                <div className="text-xs font-bold uppercase tracking-wide text-brand">Mini project</div>
+                <p className="mt-1.5 text-sm leading-6 text-body">{plan.mini_project}</p>
+              </div>
+              <div className="hover-lift rounded-xl border border-line bg-subtle p-4">
+                <div className="text-xs font-bold uppercase tracking-wide text-coral">Portfolio piece</div>
+                <p className="mt-1.5 text-sm leading-6 text-body">{plan.final_portfolio_task}</p>
+              </div>
             </div>
-            <div className="relative space-y-4 before:absolute before:bottom-4 before:left-[15px] before:top-4 before:w-px before:bg-line">
-              {plan.weekly_plan.map((week) => (
-                <div key={week.week} className="relative grid gap-3 pl-11">
-                  <span className="absolute left-0 top-0 flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface text-sm font-bold text-brand">
-                    {week.week}
-                  </span>
-                  <div className="rounded-xl border border-line bg-subtle p-4">
-                    <h3 className="text-sm font-bold text-ink">Week {week.week} · {week.theme}</h3>
-                    <ul className="mt-2.5 space-y-1.5 text-sm leading-6 text-body">
-                      {week.tasks.map((task, index) => (
-                        <li key={`${week.week}-${task}-${index}`} className="flex gap-2">
-                          <Check className="mt-1 shrink-0 text-brand" size={14} />
-                          {task}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              ))}
+            <div className="mt-4 flex items-start gap-2 rounded-xl bg-brandSofter px-3.5 py-3 text-sm leading-6 text-body">
+              <Lightbulb size={16} className="mt-0.5 shrink-0 text-brand" />
+              Make one small thing each week you can show people. Aim for proof you can do the work — not just courses you finished.
             </div>
           </Card>
         </div>
-        <aside className="space-y-5">
+
+        {/* Courses with gap-match tags */}
+        <aside className="min-w-0 space-y-5">
           <Card>
             <div className="flex items-center gap-1.5">
-              <SectionLabel icon={<GraduationCap size={15} />}>Recommended courses</SectionLabel>
+              <SectionLabel icon={<GraduationCap size={15} />}>Courses that close your gaps</SectionLabel>
               <InfoTip title="Where courses come from" source={courses?.mode === "openai_web_search" ? SOURCE.web : SOURCE.framework}>
                 {courses?.mode === "openai_web_search"
                   ? "Found via live web search for Singapore-relevant courses matching your focus skills. Verify provider links before enrolling."
@@ -1538,29 +1638,62 @@ function PlanView({ plan, courses, onBack, onExploreMore }: { plan: Plan; course
             </div>
             {courses?.notice ? <p className="mt-2 text-xs leading-5 text-muted">{courses.notice}</p> : null}
             <div className="mt-3 space-y-2.5">
-              {courses?.courses.map((course, index) => (
-                <a key={`${course.title}-${course.url}-${index}`} href={course.url} target="_blank" className="block rounded-xl border border-line bg-surface p-3.5 transition hover:border-brandRing hover:shadow-card">
-                  <div className="text-sm font-bold text-ink">{course.title}</div>
-                  <div className="mt-0.5 text-xs font-medium text-muted">{course.provider}</div>
-                  <p className="mt-1.5 text-xs leading-5 text-body">{course.reason}</p>
-                </a>
-              ))}
+              {courses?.courses.map((course, index) => {
+                const gaps = courseGapMatches(course, plan.focus_skills);
+                return (
+                  <a
+                    key={`${course.title}-${course.url}-${index}`}
+                    href={course.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover-lift animate-rise block rounded-xl border border-line bg-surface p-3.5 hover:border-brandRing"
+                    style={{ animationDelay: `${index * 70}ms` }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="break-words text-sm font-bold text-ink">{course.title}</div>
+                        <div className="mt-0.5 break-words text-xs font-medium text-muted">{course.provider}</div>
+                      </div>
+                      <ExternalLink size={14} className="mt-0.5 shrink-0 text-muted" />
+                    </div>
+                    {gaps.length ? (
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        {gaps.map((gap) => (
+                          <span key={gap} className="inline-flex items-center gap-1 rounded-full bg-brandSoft px-2 py-0.5 text-[11px] font-semibold text-brand">
+                            <Check size={11} /> Closes: {gap}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-2.5">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-subtle px-2 py-0.5 text-[11px] font-semibold text-muted">Builds related skills</span>
+                      </div>
+                    )}
+                    <p className="mt-2 text-xs leading-5 text-body">{course.reason}</p>
+                  </a>
+                );
+              })}
             </div>
-          </Card>
-          <Card className="bg-brandSofter">
-            <SectionLabel icon={<Lightbulb size={15} />}>AI mentor tip</SectionLabel>
-            <p className="mt-3 text-sm leading-6 text-body">Make one small thing each week that you can show people. By the end, aim for proof you can do the work — not just a list of courses you finished.</p>
-          </Card>
-          <Card>
-            <h2 className="text-sm font-bold text-ink">Mini project</h2>
-            <p className="mt-1.5 text-sm leading-6 text-body">{plan.mini_project}</p>
-          </Card>
-          <Card>
-            <h2 className="text-sm font-bold text-ink">Portfolio task</h2>
-            <p className="mt-1.5 text-sm leading-6 text-body">{plan.final_portfolio_task}</p>
           </Card>
         </aside>
       </div>
+
+      {/* End actions — export + next */}
+      <Card className="mt-5 animate-rise">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-ink">Take your plan with you</h2>
+            <p className="mt-1 text-xs leading-5 text-muted">Save your weekly actions, project ideas, and course links to follow at your own pace.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={copyPlan} variant="secondary" icon={copied ? <Check size={16} /> : <FileText size={16} />}>
+              {copied ? "Copied!" : "Copy plan"}
+            </Button>
+            <Button onClick={downloadPlan} icon={<Download size={16} />}>Download (.md)</Button>
+            <button onClick={onExploreMore} className="text-sm font-semibold text-brand transition hover:text-brandStrong">Explore other roles</button>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }
@@ -1762,10 +1895,26 @@ function Progress({ value }: { value: number }) {
 
 function Donut({ value, label, rawLabel = false }: { value: number; label: string; rawLabel?: boolean }) {
   const bounded = Math.max(0, Math.min(100, value));
+  // Animate the ring fill and the number counting up on mount.
+  const [fill, setFill] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const start = performance.now();
+    const duration = 850;
+    const step = (now: number) => {
+      const p = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
+      setFill(bounded * eased);
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [bounded]);
+  const shown = Math.round(fill);
   return (
-    <div className="relative mx-auto h-32 w-32 rounded-full" style={{ background: `conic-gradient(#0f766e ${bounded}%, #eaeff5 0)` }}>
+    <div className="animate-pop relative mx-auto h-32 w-32 rounded-full" style={{ background: `conic-gradient(#0f766e ${fill}%, #eaeff5 0)` }}>
       <div className="absolute inset-[10px] flex flex-col items-center justify-center rounded-full bg-surface text-center shadow-inner">
-        <div className="text-2xl font-bold tracking-tight text-brand">{rawLabel ? bounded : `${bounded}%`}</div>
+        <div className="text-2xl font-bold tracking-tight text-brand">{rawLabel ? shown : `${shown}%`}</div>
         <div className="text-[11px] font-medium text-muted">{label}</div>
       </div>
     </div>
