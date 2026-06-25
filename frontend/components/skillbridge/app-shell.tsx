@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   BadgeCheck,
@@ -1521,8 +1522,21 @@ function buildPlanExport(plan: Plan, courses: CourseSearch | null): string {
 function PlanView({ plan, courses, onBack, onExploreMore }: { plan: Plan; courses: CourseSearch | null; onBack: () => void; onExploreMore: () => void }) {
   const [openWeek, setOpenWeek] = useState<number>(plan.weekly_plan[0]?.week ?? 1);
   const [copied, setCopied] = useState(false);
+  const [exported, setExported] = useState(false);
 
   const exportText = useMemo(() => buildPlanExport(plan, courses), [plan, courses]);
+
+  // Nothing is saved server-side — the whole plan lives in memory. Warn the user
+  // before they refresh or close the tab while they still haven't saved a copy.
+  useEffect(() => {
+    if (exported) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [exported]);
 
   function downloadPlan() {
     const blob = new Blob([exportText], { type: "text/markdown" });
@@ -1532,11 +1546,13 @@ function PlanView({ plan, courses, onBack, onExploreMore }: { plan: Plan; course
     a.download = `skillbridge-plan-${plan.target_role.role_title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.md`;
     a.click();
     URL.revokeObjectURL(url);
+    setExported(true);
   }
   async function copyPlan() {
     try {
       await navigator.clipboard.writeText(exportText);
       setCopied(true);
+      setExported(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       /* clipboard may be blocked; download is the fallback */
@@ -1546,6 +1562,22 @@ function PlanView({ plan, courses, onBack, onExploreMore }: { plan: Plan; course
   return (
     <div>
       <PageHeader eyebrow="Step 4 · Your plan" title="Your 30-day plan to get there" subtitle="Read it one week at a time. Each week is a few small, real actions." action={<BackButton onClick={onBack} />} />
+
+      {/* Persistence reminder — this plan isn't saved anywhere until exported */}
+      {exported ? (
+        <div className="animate-rise mb-5 flex items-center gap-2.5 rounded-2xl border border-brand/25 bg-brandSoft px-4 py-3 text-sm font-medium text-brand">
+          <Check size={16} className="shrink-0" />
+          Saved. You can safely refresh or close this tab — your copy is yours to keep.
+        </div>
+      ) : (
+        <div className="animate-rise mb-5 flex flex-col gap-3 rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-2.5 text-sm text-amber-800">
+            <AlertTriangle size={17} className="mt-0.5 shrink-0" />
+            <span><span className="font-bold">Save your plan before you leave.</span> It lives only in this browser tab — if the page refreshes or closes, it's gone. Download or copy it to keep it.</span>
+          </div>
+          <Button onClick={downloadPlan} icon={<Download size={16} />} className="shrink-0">Save it now</Button>
+        </div>
+      )}
 
       {/* Compact overview — role + focus skills */}
       <Card className="mb-5 animate-rise border-brand/15 bg-gradient-to-br from-brandSofter via-surface to-brandSoft">
@@ -1679,11 +1711,14 @@ function PlanView({ plan, courses, onBack, onExploreMore }: { plan: Plan; course
       </div>
 
       {/* End actions — export + next */}
-      <Card className="mt-5 animate-rise">
+      <Card className={`mt-5 animate-rise ${exported ? "" : "border-amber-300/60"}`}>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-sm font-bold text-ink">Take your plan with you</h2>
-            <p className="mt-1 text-xs leading-5 text-muted">Save your weekly actions, project ideas, and course links to follow at your own pace.</p>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              Download or copy your weekly actions, project ideas, and course links — including which gap each course closes — so you can keep going at your own pace.
+              {exported ? "" : " Nothing here is saved automatically."}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={copyPlan} variant="secondary" icon={copied ? <Check size={16} /> : <FileText size={16} />}>
